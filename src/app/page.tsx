@@ -1,67 +1,130 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useRef, useEffect } from "react";
+import { Send, Zap, Sparkles, Code, PenTool } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+type Message = {
+  role: "user" | "bot";
+  content: string;
+};
+
+export default function NexusAI() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
+
+  const handleSubmit = async (e?: React.FormEvent, customInput?: string) => {
+    if (e) e.preventDefault();
+    const userMessage = customInput || input.trim();
+    if (!userMessage || isLoading) return;
+
+    setInput("");
+    setMessages(prev => [...prev, { role: "user", content: userMessage }]);
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMessage, history: messages }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || data.reply || "Failed to fetch response");
+      }
+
+      setMessages(prev => [...prev, { role: "bot", content: data.reply }]);
+    } catch (error: any) {
+      console.error(error);
+      setMessages(prev => [...prev, { role: "bot", content: `Error: ${error.message}` }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="app-container">
+      {/* Main Area */}
+      <main className="main-area">
+
+        {/* Chat Section */}
+        <div className="chat-section">
+          {messages.length === 0 ? (
+            <div className="chat-content-max">
+              <h1 className="hero-title">How can I help you today?</h1>
+              <div className="bento-grid">
+                <div className="action-card" onClick={() => handleSubmit(undefined, "Help me brainstorm some creative ideas for my new project.")}>
+                  <div className="card-icon"><Sparkles size={20} /></div>
+                  <div className="card-title">Brainstorm</div>
+                  <div className="card-desc">Generate creative ideas, outlines, and unique concepts.</div>
+                </div>
+                <div className="action-card" onClick={() => handleSubmit(undefined, "Can you help me write a Python script for data analysis?")}>
+                  <div className="card-icon"><Code size={20} /></div>
+                  <div className="card-title">Write Code</div>
+                  <div className="card-desc">Get assistance with programming, debugging, and scripts.</div>
+                </div>
+                <div className="action-card" onClick={() => handleSubmit(undefined, "Write a professional email to my boss asking for feedback.")}>
+                  <div className="card-icon"><PenTool size={20} /></div>
+                  <div className="card-title">Draft Content</div>
+                  <div className="card-desc">Create professional emails, essays, or blog posts.</div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="chat-content-max">
+              {messages.map((msg, index) => (
+                <div key={index} className={`message ${msg.role} ${msg.role === 'bot' ? 'markdown-body' : ''}`}>
+                  {msg.role === "bot" ? (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                  ) : (
+                    msg.content
+                  )}
+                </div>
+              ))}
+              {isLoading && (
+                <div className="message bot">
+                  Typing...
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+
+        {/* Input Footer */}
+        <div className="input-footer">
+          <form className="input-container" onSubmit={handleSubmit}>
+            <input
+              type="text"
+              className="chat-input"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask me anything..."
+              disabled={isLoading}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <div className="action-group">
+
+              <button type="submit" className="send-btn" disabled={!input.trim() || isLoading}>
+                <Send size={18} />
+              </button>
+            </div>
+          </form>
+          <div className="disclaimer">
+            Nexus AI can make mistakes. Please verify important information.
+          </div>
         </div>
       </main>
     </div>
